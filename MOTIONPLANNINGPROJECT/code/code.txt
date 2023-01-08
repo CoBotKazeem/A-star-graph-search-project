@@ -1,0 +1,83 @@
+clc 
+clear
+close all
+addpath('results'); % add path's result
+nodes = csvread('nodes.csv');
+nodes_number = size(nodes,1); % number of nodes
+
+edges = csvread('edges.csv');
+edges_number = size(edges,1); % number of edges
+edges_rearranged = -1*ones(nodes_number, nodes_number); % initialize matrix of costs with -1 for no edge available
+
+% Associating nodes' numbers based on the edge's values rearranged
+for i = 1:edges_number
+    edge_from = edges(i,1);
+    edge_to = edges(i,2);
+    edge_value = edges(i,3);
+    edges_rearranged(edge_from, edge_to) = edge_value;
+    edges_rearranged(edge_to, edge_from) = edge_value;
+end
+
+parent = nan([nodes_number 1]); % initialize parents
+past_cost = Inf([nodes_number 1]); % initialize past costs
+past_cost(1) = 0; % past cost for node 1 is 0 and the remaining infinite
+OPEN = 1; % node 1 is the start
+CLOSED = []; % it's no any node in CLOSED yet
+
+heuristic_cost_to_go = nodes(:,4); % heuristic cost to reach each node
+
+est_total_cost = past_cost + heuristic_cost_to_go; % initialize estimated total cost
+
+% A* Star Algorithm
+
+while(isempty(OPEN) ~= 1)
+    current = OPEN(1);
+    CLOSED = [CLOSED, current];
+    OPEN(1) = [];
+    
+    if(current == nodes_number)
+        
+        path_node = nodes_number;
+        path = nodes_number;
+        for i = nodes_number:-1:1
+            if(parent(path_node) == i)
+                path = [i path];
+                path_node = i;
+            end
+        end
+        % Write in the results folder the path.csv file
+        csvwrite('results/path.csv', path);
+        break;
+    else
+        for nbr = 1:nodes_number
+            if((edges_rearranged(current, nbr) ~= -1) && (isempty(find(CLOSED==nbr,1)))) % check if edge from current node to neighbor exists
+                tentative_past_cost = past_cost(current)+edges_rearranged(current,nbr); % tentative past cost of the neighbor
+                if(tentative_past_cost < past_cost(nbr))
+                    past_cost(nbr) = tentative_past_cost;
+                    parent(nbr) = current;
+                    est_total_cost(nbr) = past_cost(nbr) + heuristic_cost_to_go(nbr);                    
+                    % If the node is not already in the OPEN array, it must be added, otherwise sort the array with the new estimated total costs
+                    if(isempty(find(OPEN == nbr,1)) == 1)
+                        OPEN = [OPEN nbr];
+                    end                   
+                    % Sorting the OPEN array
+                    temp_OPEN = 0;
+                    j = 1;
+                    for i = 1:j
+                        for j = 1:length(OPEN)
+                            if(est_total_cost(i) > est_total_cost(j))
+                                temp_OPEN = OPEN(i);
+                                OPEN(i) = OPEN(j);
+                                OPEN(j) = temp_OPEN;
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+if(isempty(OPEN) == 1)
+    % No path found
+    csvwrite('path.csv', 1);
+end
